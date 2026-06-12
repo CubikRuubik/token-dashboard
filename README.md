@@ -7,8 +7,10 @@ A full-stack ERC-20 token dashboard built with Next.js. Connect a wallet, track 
 - Connect any wallet via RainbowKit (MetaMask, WalletConnect, etc.)
 - Add any ERC-20 token by contract address — name, symbol, and decimals are resolved on-chain
 - View token balances read directly from the chain
-- Send tokens with live wallet confirmation status
-- Transfer history indexed from on-chain `Transfer` events via a background indexer
+- Send ETH or any ERC-20 token with live wallet confirmation status
+- ERC-20 transfer history indexed live from on-chain `Transfer` events via a background indexer
+- ETH transfer history fetched from Alchemy — scoped to the current server session (no old history)
+- Activity feed shows token symbols and full filter (All / Received / Sent)
 - Dark / light theme toggle
 
 ## Tech stack
@@ -33,7 +35,9 @@ app/
       route.ts            # GET, POST /api/tokens
       [id]/route.ts       # DELETE /api/tokens/:id
     transfers/
-      route.ts            # GET /api/transfers
+      route.ts            # GET /api/transfers — ERC-20 history from DB, includes symbol
+    eth-transfers/
+      route.ts            # GET /api/eth-transfers — ETH history via Alchemy, session-scoped
 
 components/
   Sidebar.tsx             # Icon rail — navigation, theme toggle, disconnect
@@ -44,7 +48,7 @@ components/
   TokensView.tsx          # Token management — add, remove, send per token
   modals/
     AddTokenModal.tsx     # Resolves ERC-20 contract on-chain, saves to DB
-    SendModal.tsx         # Token picker + transfer form (useWriteContract)
+    SendModal.tsx         # Token picker + transfer form — ETH (useSendTransaction) or ERC-20 (useWriteContract)
     ReceiveModal.tsx      # Wallet address + faux QR code
   ui/
     Icon.tsx              # Icon component backed by react-icons
@@ -117,7 +121,7 @@ Removes a token from the watchlist by its database ID.
 
 ### `GET /api/transfers?address=<0x...>`
 
-Returns all transfers where the given address is either sender or recipient, ordered newest first.
+Returns all ERC-20 transfers where the given address is either sender or recipient, ordered newest first. Each row includes the token `symbol` resolved from the DB.
 
 **Response** `200`
 
@@ -126,11 +130,35 @@ Returns all transfers where the given address is either sender or recipient, ord
   {
     "id": 1,
     "tokenAddress": "0xabc...",
+    "symbol": "USDC",
     "from": "0x111...",
     "to": "0x222...",
     "amount": "150.0",
     "txHash": "0xdef...",
     "createdAt": "2026-06-11T14:02:00.000Z"
+  }
+]
+```
+
+---
+
+### `GET /api/eth-transfers?address=<0x...>`
+
+Returns ETH transfers (sends and receives) for the given address using Alchemy's `alchemy_getAssetTransfers` API. Results are scoped to blocks from the current server session onward — the starting block is captured once on first request and reused until the server restarts.
+
+**Response** `200`
+
+```json
+[
+  {
+    "id": "0xhash...",
+    "tokenAddress": "ETH",
+    "symbol": "ETH",
+    "from": "0x111...",
+    "to": "0x222...",
+    "amount": "0.050000",
+    "txHash": "0xhash...",
+    "createdAt": "2026-06-11T14:05:00.000Z"
   }
 ]
 ```
@@ -165,11 +193,14 @@ model Transfer {
 
 ## Indexer
 
-The indexer (`scripts/indexer.ts`) is a separate Node.js process that subscribes to on-chain `Transfer` events for every token in the DB. It runs alongside the Next.js server — the API never writes transfers directly.
+The indexer (`scripts/indexer.ts`) is a separate Node.js process that subscribes to on-chain `Transfer` events for every ERC-20 token in the DB. It runs alongside the Next.js server — the API never writes transfers directly.
 
 - Connects to Sepolia via Alchemy WebSocket (`ALCHEMY_WS_URL`)
 - Uses `watchContractEvent` from viem to receive live events
+- Polls the DB every 30 s for newly added tokens and starts watching them automatically
 - Writes to SQLite with `upsert` on `txHash` — safe to restart, no duplicates
+
+ETH transfers are **not** indexed — they are fetched on demand from Alchemy via `/api/eth-transfers`.
 
 ## Getting started
 
