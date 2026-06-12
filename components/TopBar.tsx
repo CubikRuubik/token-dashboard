@@ -16,12 +16,11 @@ function shortenAddr(addr: string) {
 }
 
 export default function TopBar({
-  view, connected, onConnect, onAddToken, onSend,
+  view, connected, onConnect, onSend,
 }: {
   view: View
   connected: boolean
   onConnect: (() => void) | undefined
-  onAddToken: () => void
   onSend: () => void
 }) {
   const { address } = useAccount()
@@ -39,9 +38,6 @@ export default function TopBar({
       <div className="topbar-actions">
         {connected ? (
           <>
-            <button className="btn btn-ghost" onClick={onAddToken}>
-              <Icon name="plus" /> Add token
-            </button>
             <button className="btn btn-soft" onClick={onSend}>
               <Icon name="send" /> Send
             </button>

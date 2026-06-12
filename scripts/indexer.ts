@@ -24,17 +24,14 @@ async function main() {
   const adapter = new PrismaLibSql({ url: process.env.DATABASE_URL! })
   const prisma = new PrismaClient({ adapter })
 
-  // Tell SQLite to wait up to 5s when the DB is locked instead of failing immediately
   await prisma.$executeRaw`PRAGMA busy_timeout = 5000`
 
-  const tokens = await prisma.token.findMany()
+  const watching = new Set<string>()
 
-  if (tokens.length === 0) {
-    console.log('No tokens in DB yet. Add a token in the UI first.')
-    process.exit(0)
-  }
+  async function startWatching(tokenAddress: string) {
+    if (watching.has(tokenAddress)) return
+    watching.add(tokenAddress)
 
-  for (const { address: tokenAddress } of tokens) {
     const address = tokenAddress as `0x${string}`
 
     let decimals: number
@@ -65,19 +62,20 @@ async function main() {
 
           const amount = formatUnits(value, decimals)
 
+          const exists = await prisma.transfer.findUnique({
+            where: { txHash: log.transactionHash },
+            select: { id: true },
+          })
+
           await prisma.transfer.upsert({
             where: { txHash: log.transactionHash },
             update: {},
-            create: {
-              tokenAddress: address,
-              from,
-              to,
-              amount,
-              txHash: log.transactionHash,
-            },
+            create: { tokenAddress: address, from, to, amount, txHash: log.transactionHash },
           })
 
-          console.log(`Transfer: ${from.slice(0, 8)}... → ${to.slice(0, 8)}... ${amount}`)
+          if (!exists) {
+            console.log(`New transfer: ${from.slice(0, 8)}... → ${to.slice(0, 8)}... ${amount}`)
+          }
         }
       },
       onError: (error) => {
@@ -87,7 +85,21 @@ async function main() {
     })
   }
 
-  console.log(`Indexer running, watching ${tokens.length} token(s)...`)
+  async function syncTokens() {
+    const tokens = await prisma.token.findMany()
+    const newTokens = tokens.filter(t => !watching.has(t.address))
+    for (const token of newTokens) {
+      await startWatching(token.address)
+    }
+    if (watching.size === 0) {
+      console.log('No tokens in DB yet — waiting for tokens to be added...')
+    }
+  }
+
+  await syncTokens()
+  setInterval(syncTokens, 30_000)
+
+  console.log('Indexer running.')
 }
 
 main().catch((err) => {

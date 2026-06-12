@@ -56,7 +56,6 @@ export default function Home() {
           view={view}
           connected={isConnected}
           onConnect={openConnectModal}
-          onAddToken={openAdd}
           onSend={() => openSend()}
         />
 

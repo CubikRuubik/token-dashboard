@@ -13,13 +13,13 @@ A full-stack ERC-20 token dashboard built with Next.js. Connect a wallet, track 
 
 ## Tech stack
 
-| Layer | Library |
-|---|---|
-| Framework | Next.js 16 (App Router) |
-| Wallet / chain | wagmi v2 + viem, RainbowKit v2 |
-| Database | SQLite via Prisma 7 + `@prisma/adapter-libsql` |
-| Chain RPC | Alchemy WebSocket (Sepolia) |
-| Icons | react-icons |
+| Layer          | Library                                        |
+| -------------- | ---------------------------------------------- |
+| Framework      | Next.js 16 (App Router)                        |
+| Wallet / chain | wagmi v2 + viem, RainbowKit v2                 |
+| Database       | SQLite via Prisma 7 + `@prisma/adapter-libsql` |
+| Chain RPC      | Alchemy WebSocket (Sepolia)                    |
+| Icons          | react-icons                                    |
 
 ## Project structure
 
@@ -70,6 +70,7 @@ scripts/
 Returns all tracked tokens for the given chain.
 
 **Response** `200`
+
 ```json
 [
   {
@@ -91,6 +92,7 @@ Returns all tracked tokens for the given chain.
 Adds a token to the watchlist. Idempotent — re-adding the same address on the same chain is a no-op.
 
 **Body**
+
 ```json
 {
   "address": "0xabc...",
@@ -118,6 +120,7 @@ Removes a token from the watchlist by its database ID.
 Returns all transfers where the given address is either sender or recipient, ordered newest first.
 
 **Response** `200`
+
 ```json
 [
   {
