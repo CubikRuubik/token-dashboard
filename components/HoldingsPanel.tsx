@@ -7,9 +7,9 @@ import TokenBadge from './ui/TokenBadge'
 import type { Token } from '@/lib/tokens'
 
 function HoldingRow({
-  token, connected, onSend, onReceive,
+  token, connected, onSend,
 }: {
-  token: Token; connected: boolean; onSend: (id: number) => void; onReceive: (addr: string) => void
+  token: Token; connected: boolean; onSend: (id: number) => void
 }) {
   const { address } = useAccount()
   const { data: balance, isLoading } = useReadContract({
@@ -44,21 +44,16 @@ function HoldingRow({
           onClick={() => onSend(token.id)}>
           <Icon name="send" />
         </button>
-        <button className="icon-btn" title={`Receive ${token.symbol}`} disabled={!connected}
-          onClick={() => onReceive(token.address)}>
-          <Icon name="arrowDown" />
-        </button>
       </div>
     </div>
   )
 }
 
 export default function HoldingsPanel({
-  connected, onSend, onReceive, onConnect, onAddToken, refreshKey,
+  connected, onSend, onConnect, onAddToken, refreshKey,
 }: {
   connected: boolean
   onSend: (tokenId: number) => void
-  onReceive: (addr: string) => void
   onConnect: (() => void) | undefined
   onAddToken: () => void
   refreshKey: number
@@ -104,7 +99,7 @@ export default function HoldingsPanel({
 
       {tokens.map(t => (
         <HoldingRow key={`${t.chainId}-${t.address}`} token={t}
-          connected={connected} onSend={onSend} onReceive={onReceive} />
+          connected={connected} onSend={onSend} />
       ))}
 
       {!connected && (

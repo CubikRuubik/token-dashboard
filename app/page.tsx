@@ -10,14 +10,12 @@ import ActivityView from '@/components/ActivityView'
 import TokensView from '@/components/TokensView'
 import AddTokenModal from '@/components/modals/AddTokenModal'
 import SendModal from '@/components/modals/SendModal'
-import ReceiveModal from '@/components/modals/ReceiveModal'
 import Toast from '@/components/ui/Toast'
 
 type View = 'dashboard' | 'activity' | 'tokens'
 type Modal =
   | { type: 'add' }
   | { type: 'send'; tokenId?: number }
-  | { type: 'receive' }
 
 export default function Home() {
   const { isConnected } = useAccount()
@@ -36,7 +34,6 @@ export default function Home() {
 
   const openAdd = () => setModal({ type: 'add' })
   const openSend = (tokenId?: number) => setModal({ type: 'send', tokenId })
-  const openReceive = () => setModal({ type: 'receive' })
   const closeModal = () => setModal(null)
   const showToast = (msg: string) => setToast(msg)
 
@@ -65,7 +62,6 @@ export default function Home() {
               <HoldingsPanel
                 connected={isConnected}
                 onSend={openSend}
-                onReceive={openReceive}
                 onConnect={openConnectModal}
                 onAddToken={openAdd}
                 refreshKey={tokenRefreshKey}
@@ -102,9 +98,6 @@ export default function Home() {
           onClose={closeModal}
           onSent={(sym, amt) => { closeModal(); showToast(`Sent ${amt} ${sym} · transaction submitted`) }}
         />
-      )}
-      {modal?.type === 'receive' && (
-        <ReceiveModal onClose={closeModal} />
       )}
 
       {toast && <Toast msg={toast} onDone={() => setToast(null)} />}
