@@ -4,7 +4,7 @@ import { useAccount } from 'wagmi'
 import Icon from './ui/Icon'
 
 type Transfer = {
-  id: number; tokenAddress: string; from: string; to: string;
+  id: number; tokenAddress: string; symbol?: string | null; from: string; to: string;
   amount: string; txHash: string; createdAt: string
 }
 
@@ -18,7 +18,7 @@ function ActivityRow({ t, myAddress }: { t: Transfer; myAddress: string }) {
         <Icon name={isIn ? 'arrowDownLeft' : 'arrowUpRight'} />
       </div>
       <div className="act-main">
-        <div className="t1">{isIn ? 'Received' : 'Sent'}</div>
+        <div className="t1">{isIn ? 'Received' : 'Sent'} {t.symbol ?? ''}</div>
         <div className="t2">
           <span>{isIn ? 'From' : 'To'} {shortenAddr(isIn ? t.from : t.to)}</span>
           <span className="dotsep" />
@@ -26,7 +26,7 @@ function ActivityRow({ t, myAddress }: { t: Transfer; myAddress: string }) {
         </div>
       </div>
       <div className="act-amt">
-        <div className={`a num ${isIn ? 'in' : ''}`}>{isIn ? '+' : '−'}{t.amount}</div>
+        <div className={`a num ${isIn ? 'in' : ''}`}>{isIn ? '+' : '−'}{t.amount} {t.symbol ?? ''}</div>
       </div>
     </div>
   )
@@ -44,10 +44,15 @@ export default function ActivityPanel({
   useEffect(() => {
     if (!address || !connected) return
     function fetch_() {
-      fetch(`/api/transfers?address=${address}`)
-        .then(r => r.json())
-        .then(data => setTransfers(data))
-        .catch(() => {})
+      Promise.all([
+        fetch(`/api/transfers?address=${address}`).then(r => r.json()),
+        fetch(`/api/eth-transfers?address=${address}`).then(r => r.json()),
+      ]).then(([erc20, eth]) => {
+        const combined = [...erc20, ...eth].sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )
+        setTransfers(combined)
+      }).catch(() => {})
     }
     fetch_()
     const id = setInterval(fetch_, 5000)

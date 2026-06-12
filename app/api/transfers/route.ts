@@ -13,5 +13,16 @@ export async function GET(request: NextRequest) {
     orderBy: { createdAt: 'desc' },
   })
 
-  return Response.json(transfers)
+  // Resolve symbols for all unique token addresses in one query
+  const addresses = [...new Set(transfers.map(t => t.tokenAddress))]
+  const tokens = await prisma.token.findMany({
+    where: { address: { in: addresses } },
+    select: { address: true, symbol: true },
+  })
+  const symbolMap = Object.fromEntries(tokens.map(t => [t.address.toLowerCase(), t.symbol]))
+
+  return Response.json(transfers.map(t => ({
+    ...t,
+    symbol: symbolMap[t.tokenAddress.toLowerCase()] ?? null,
+  })))
 }

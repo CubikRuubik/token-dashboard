@@ -5,7 +5,7 @@ import Icon from './ui/Icon'
 import TokenBadge from './ui/TokenBadge'
 
 type Transfer = {
-  id: number; tokenAddress: string; from: string; to: string;
+  id: number; tokenAddress: string; symbol?: string | null; from: string; to: string;
   amount: string; txHash: string; createdAt: string
 }
 
@@ -19,10 +19,15 @@ export default function ActivityView() {
   useEffect(() => {
     if (!address) return
     function fetch_() {
-      fetch(`/api/transfers?address=${address}`)
-        .then(r => r.json())
-        .then(setTransfers)
-        .catch(() => {})
+      Promise.all([
+        fetch(`/api/transfers?address=${address}`).then(r => r.json()),
+        fetch(`/api/eth-transfers?address=${address}`).then(r => r.json()),
+      ]).then(([erc20, eth]) => {
+        const combined = [...erc20, ...eth].sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )
+        setTransfers(combined)
+      }).catch(() => {})
     }
     fetch_()
     const id = setInterval(fetch_, 5000)
@@ -95,9 +100,17 @@ export default function ActivityView() {
                 </span>
               </span>
               <span className="asset">
-                <TokenBadge symbol={t.tokenAddress.slice(2, 6).toUpperCase()} address={t.tokenAddress} size="sm" />
-                <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                  {shortenAddr(t.tokenAddress)}
+                {t.tokenAddress === 'ETH' ? (
+                  <span className="tok sm" style={{ background: 'radial-gradient(120% 120% at 30% 20%, #627eea, #3a56c4)' }}>ETH</span>
+                ) : (
+                  <TokenBadge symbol={t.symbol ?? t.tokenAddress.slice(2, 6).toUpperCase()} address={t.tokenAddress} size="sm" />
+                )}
+                <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)' }}>
+                  {t.tokenAddress === 'ETH' ? (
+                    <span style={{ color: 'var(--text-muted)' }}>Ether</span>
+                  ) : (
+                    <span style={{ color: 'var(--text-muted)' }}>{shortenAddr(t.tokenAddress)}</span>
+                  )}
                 </span>
               </span>
               <span>
