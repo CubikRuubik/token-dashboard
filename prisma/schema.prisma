@@ -1,0 +1,30 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Token {
+  id        Int      @id @default(autoincrement())
+  address   String
+  name      String
+  symbol    String
+  decimals  Int
+  chainId   Int
+  createdAt DateTime @default(now())
+
+  @@unique([address, chainId])
+}
+
+model Transfer {
+  id           Int      @id @default(autoincrement())
+  tokenAddress String
+  from         String
+  to           String
+  amount       String
+  txHash       String   @unique
+  createdAt    DateTime @default(now())
+}
