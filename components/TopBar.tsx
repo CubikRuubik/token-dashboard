@@ -1,5 +1,6 @@
 'use client'
-import { useAccount } from 'wagmi'
+import { useAccount, useBalance } from 'wagmi'
+import { formatUnits } from 'viem'
 import Icon from './ui/Icon'
 
 type View = 'dashboard' | 'activity' | 'tokens'
@@ -24,6 +25,7 @@ export default function TopBar({
   onSend: () => void
 }) {
   const { address } = useAccount()
+  const { data: ethBalance } = useBalance({ address })
   const m = VIEW_META[view]
   return (
     <header className="topbar">
@@ -47,6 +49,12 @@ export default function TopBar({
               <span className="net-dot" />
               <span className="net-name">Sepolia</span>
             </div>
+            {ethBalance && (
+              <div className="net-pill">
+                <span className="num">{parseFloat(formatUnits(ethBalance.value, ethBalance.decimals)).toFixed(4)}</span>
+                <span className="net-name">ETH</span>
+              </div>
+            )}
             <div className="wallet-pill">
               <span className="addr">{address ? shortenAddr(address) : ''}</span>
               <span className="avatar" />
