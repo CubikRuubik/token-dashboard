@@ -1,9 +1,0 @@
--- CreateTable
-CREATE TABLE "Transfer" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    "from" TEXT NOT NULL,
-    "to" TEXT NOT NULL,
-    "amount" TEXT NOT NULL,
-    "txHash" TEXT NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-);

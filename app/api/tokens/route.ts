@@ -1,33 +1,23 @@
 import { NextRequest } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { api, apiErrorResponse } from '@/lib/api'
 
 export async function GET(request: NextRequest) {
   const chainId = request.nextUrl.searchParams.get('chainId')
-
-  if (!chainId) {
-    return Response.json({ error: 'chainId query param is required' }, { status: 400 })
+  if (!chainId) return Response.json({ error: 'chainId query param is required' }, { status: 400 })
+  try {
+    const data = await api.get(`/tokens?chainId=${chainId}`)
+    return Response.json(data)
+  } catch (err) {
+    return apiErrorResponse(err)
   }
-
-  const tokens = await prisma.token.findMany({
-    where: { chainId: Number(chainId) },
-    orderBy: { createdAt: 'asc' },
-  })
-
-  return Response.json(tokens)
 }
 
 export async function POST(request: NextRequest) {
-  const { address, name, symbol, decimals, chainId } = await request.json()
-
-  if (!address || !name || !symbol || decimals === undefined || !chainId) {
-    return Response.json({ error: 'address, name, symbol, decimals, and chainId are required' }, { status: 400 })
+  try {
+    const body = await request.json()
+    const data = await api.post('/tokens', body)
+    return Response.json(data, { status: 201 })
+  } catch (err) {
+    return apiErrorResponse(err)
   }
-
-  const token = await prisma.token.upsert({
-    where: { address_chainId: { address, chainId } },
-    update: {},
-    create: { address, name, symbol, decimals, chainId },
-  })
-
-  return Response.json(token, { status: 201 })
 }
