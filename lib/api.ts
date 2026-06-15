@@ -26,7 +26,7 @@ export function apiErrorResponse(err: unknown): Response {
 }
 
 export const api = {
-  get: <T = unknown>(path: string) => request<T>(path),
+  get: <T = unknown>(path: string, init?: RequestInit) => request<T>(path, init),
   post: <T = unknown>(path: string, body: unknown) =>
     request<T>(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
   delete: (path: string) =>

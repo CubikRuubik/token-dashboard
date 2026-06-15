@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useAccount } from 'wagmi'
 import Icon from './ui/Icon'
 import TokenBadge from './ui/TokenBadge'
+import { useAuth } from '@/lib/auth'
 
 type Transfer = {
   id: number; tokenAddress: string; symbol?: string | null; from: string; to: string;
@@ -13,28 +14,37 @@ function shortenAddr(a: string) { return `${a.slice(0,6)}...${a.slice(-4)}` }
 
 export default function ActivityView() {
   const { address } = useAccount()
+  const { jwt, signing, signIn } = useAuth()
   const [transfers, setTransfers] = useState<Transfer[]>([])
   const [filter, setFilter] = useState<'all' | 'in' | 'out'>('all')
   const [fetchError, setFetchError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!address) return
+    if (!address || !jwt) return
     function fetch_() {
+      const headers = { Authorization: `Bearer ${jwt}` }
       Promise.all([
-        fetch(`/api/transfers?address=${address}`).then(r => { if (!r.ok) throw new Error(r.status === 503 ? 'Backend unavailable' : 'Transfer history failed to load'); return r.json() }),
-        fetch(`/api/eth-transfers?address=${address}`).then(r => { if (!r.ok) throw new Error(r.status === 503 ? 'Backend unavailable' : 'Transfer history failed to load'); return r.json() }),
+        fetch(`/api/transfers?address=${address}`, { headers }).then(r => {
+          if (r.status === 401) throw new Error('auth')
+          if (!r.ok) throw new Error(r.status === 503 ? 'Backend unavailable' : 'Transfer history failed to load')
+          return r.json()
+        }),
+        fetch(`/api/eth-transfers?address=${address}`).then(r => {
+          if (!r.ok) throw new Error(r.status === 503 ? 'Backend unavailable' : 'Transfer history failed to load')
+          return r.json()
+        }),
       ]).then(([erc20, eth]) => {
         setFetchError(null)
         const combined = [...erc20, ...eth].sort(
           (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         )
         setTransfers(combined)
-      }).catch((err: Error) => setFetchError(err.message))
+      }).catch((err: Error) => setFetchError(err.message === 'auth' ? 'Session expired' : err.message))
     }
     fetch_()
     const id = setInterval(fetch_, 5000)
     return () => clearInterval(id)
-  }, [address])
+  }, [address, jwt])
 
   const rows = transfers.filter(t => {
     if (filter === 'all') return true
@@ -47,6 +57,8 @@ export default function ActivityView() {
     { id: 'in' as const, label: 'Received' },
     { id: 'out' as const, label: 'Sent' },
   ]
+
+  const needsAuth = !jwt && !signing
 
   return (
     <div className="content-inner">
@@ -85,12 +97,23 @@ export default function ActivityView() {
           <span>Tx</span>
         </div>
 
-        {fetchError && (
+        {signing && (
+          <div style={{ padding: '40px 22px', textAlign: 'center', color: 'var(--text-faint)', fontSize: 13.5 }}>
+            Waiting for signature…
+          </div>
+        )}
+        {(needsAuth || fetchError === 'Session expired') && !signing && (
+          <div style={{ padding: '40px 22px', textAlign: 'center', color: 'var(--text-faint)', fontSize: 13.5 }}>
+            <div style={{ marginBottom: 12 }}>{fetchError === 'Session expired' ? 'Session expired.' : 'Sign in to view your transfer history.'}</div>
+            <button className="btn btn-primary" onClick={signIn}>Sign in with wallet</button>
+          </div>
+        )}
+        {fetchError && fetchError !== 'Session expired' && (
           <div style={{ padding: '40px 22px', textAlign: 'center', color: 'var(--negative, #e05)', fontSize: 13.5 }}>
             {fetchError}
           </div>
         )}
-        {!fetchError && rows.length === 0 && (
+        {!fetchError && !needsAuth && !signing && rows.length === 0 && (
           <div style={{ padding: '40px 22px', textAlign: 'center', color: 'var(--text-faint)', fontSize: 13.5 }}>
             No transfers yet.
           </div>
