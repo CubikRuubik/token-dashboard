@@ -40,19 +40,21 @@ export default function ActivityPanel({
 }) {
   const { address } = useAccount()
   const [transfers, setTransfers] = useState<Transfer[]>([])
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!address || !connected) return
     function fetch_() {
       Promise.all([
-        fetch(`/api/transfers?address=${address}`).then(r => r.json()),
-        fetch(`/api/eth-transfers?address=${address}`).then(r => r.json()),
+        fetch(`/api/transfers?address=${address}`).then(r => { if (!r.ok) throw new Error(r.status === 503 ? 'Backend unavailable' : 'Transfer history failed to load'); return r.json() }),
+        fetch(`/api/eth-transfers?address=${address}`).then(r => { if (!r.ok) throw new Error(r.status === 503 ? 'Backend unavailable' : 'Transfer history failed to load'); return r.json() }),
       ]).then(([erc20, eth]) => {
+        setFetchError(null)
         const combined = [...erc20, ...eth].sort(
           (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         )
         setTransfers(combined)
-      }).catch(() => {})
+      }).catch((err: Error) => setFetchError(err.message))
     }
     fetch_()
     const id = setInterval(fetch_, 5000)
@@ -78,7 +80,11 @@ export default function ActivityPanel({
         <h2>Recent activity</h2>
         {transfers.length > 0 && <span className="count">{transfers.length}</span>}
       </div>
-      {transfers.length === 0 ? (
+      {fetchError ? (
+        <div style={{ padding: '32px 22px', textAlign: 'center', color: 'var(--negative, #e05)', fontSize: 13.5 }}>
+          {fetchError}
+        </div>
+      ) : transfers.length === 0 ? (
         <div style={{ padding: '32px 22px', textAlign: 'center', color: 'var(--text-faint)', fontSize: 13.5 }}>
           No transfers yet.
         </div>

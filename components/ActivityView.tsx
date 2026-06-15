@@ -15,19 +15,21 @@ export default function ActivityView() {
   const { address } = useAccount()
   const [transfers, setTransfers] = useState<Transfer[]>([])
   const [filter, setFilter] = useState<'all' | 'in' | 'out'>('all')
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!address) return
     function fetch_() {
       Promise.all([
-        fetch(`/api/transfers?address=${address}`).then(r => r.json()),
-        fetch(`/api/eth-transfers?address=${address}`).then(r => r.json()),
+        fetch(`/api/transfers?address=${address}`).then(r => { if (!r.ok) throw new Error(r.status === 503 ? 'Backend unavailable' : 'Transfer history failed to load'); return r.json() }),
+        fetch(`/api/eth-transfers?address=${address}`).then(r => { if (!r.ok) throw new Error(r.status === 503 ? 'Backend unavailable' : 'Transfer history failed to load'); return r.json() }),
       ]).then(([erc20, eth]) => {
+        setFetchError(null)
         const combined = [...erc20, ...eth].sort(
           (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         )
         setTransfers(combined)
-      }).catch(() => {})
+      }).catch((err: Error) => setFetchError(err.message))
     }
     fetch_()
     const id = setInterval(fetch_, 5000)
@@ -83,7 +85,12 @@ export default function ActivityView() {
           <span>Tx</span>
         </div>
 
-        {rows.length === 0 && (
+        {fetchError && (
+          <div style={{ padding: '40px 22px', textAlign: 'center', color: 'var(--negative, #e05)', fontSize: 13.5 }}>
+            {fetchError}
+          </div>
+        )}
+        {!fetchError && rows.length === 0 && (
           <div style={{ padding: '40px 22px', textAlign: 'center', color: 'var(--text-faint)', fontSize: 13.5 }}>
             No transfers yet.
           </div>

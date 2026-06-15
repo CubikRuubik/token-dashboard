@@ -115,10 +115,11 @@ export default function SendModal({
   }, [isSuccess]) // eslint-disable-line
 
   const validTo = isAddress(to.trim())
+  const isSelf = validTo && address && to.trim().toLowerCase() === address.toLowerCase()
   const num = parseFloat(amount)
   const validAmt = !isNaN(num) && num > 0 && num <= balanceFormatted
   const over = !isNaN(num) && num > balanceFormatted && balanceFormatted > 0
-  const canSend = validTo && validAmt && !!selectedToken && !isPending && !isConfirming
+  const canSend = validTo && !isSelf && validAmt && !!selectedToken && !isPending && !isConfirming
 
   function handleSend() {
     if (!canSend || !selectedToken) return
@@ -171,9 +172,10 @@ export default function SendModal({
 
           <div className="field">
             <label>Recipient address</label>
-            <input className={`input mono ${to.trim() && !validTo ? 'input-err' : ''}`}
+            <input className={`input mono ${to.trim() && (!validTo || isSelf) ? 'input-err' : ''}`}
               placeholder="0x0000…0000" value={to} onChange={e => setTo(e.target.value)} />
             {to.trim() && !validTo && <span className="err-msg">Invalid recipient address.</span>}
+            {isSelf && <span className="err-msg">Cannot send to your own address.</span>}
           </div>
 
           <div className="summary-box">
@@ -181,7 +183,7 @@ export default function SendModal({
             <div className="bal-line"><span className="l">Recipient gets</span><span className="v">{validAmt ? num.toLocaleString('en-US', { maximumFractionDigits: 6 }) : '0'} {selectedToken?.symbol}</span></div>
           </div>
 
-          {error && <span className="err-msg">{error.message.split('\n')[0]}</span>}
+          {error && <span className="err-msg">Transfer failed: {error.message.split('\n')[0]}</span>}
           {isSuccess && txHash && (
             <a href={`https://sepolia.etherscan.io/tx/${txHash}`} target="_blank" rel="noopener noreferrer"
               className="tx-link" style={{ justifyContent: 'center' }}>
