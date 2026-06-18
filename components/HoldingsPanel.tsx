@@ -17,7 +17,8 @@ function HoldingRow({
     abi: erc20Abi,
     functionName: 'balanceOf',
     args: [address!],
-    query: { enabled: !!address && connected },
+    // Re-read on-chain balance periodically so it reflects transfers (~1 Sepolia block).
+    query: { enabled: !!address && connected, refetchInterval: 12_000 },
   })
 
   const formatted = isLoading
@@ -61,12 +62,15 @@ export default function HoldingsPanel({
   const chainId = useChainId()
   const [tokens, setTokens] = useState<Token[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   useEffect(() => {
     setIsLoading(true)
+    setFetchError(null)
     fetch(`/api/tokens?chainId=${chainId}`)
-      .then(r => r.json())
-      .then(data => { setTokens(data); setIsLoading(false) })
+      .then(r => { if (!r.ok) throw new Error('Backend unavailable'); return r.json() })
+      .then(data => { setTokens(Array.isArray(data) ? data : []); setIsLoading(false) })
+      .catch((err: Error) => { setFetchError(err.message); setIsLoading(false) })
   }, [chainId, refreshKey])
 
   return (
@@ -91,7 +95,11 @@ export default function HoldingsPanel({
         <div style={{ padding: '24px 22px', color: 'var(--text-faint)', fontSize: 13.5 }}>Loading...</div>
       )}
 
-      {!isLoading && tokens.length === 0 && (
+      {!isLoading && fetchError && (
+        <div style={{ padding: '24px 22px', color: 'var(--negative, #e05)', fontSize: 13.5 }}>{fetchError}</div>
+      )}
+
+      {!isLoading && !fetchError && tokens.length === 0 && (
         <div style={{ padding: '34px 22px', textAlign: 'center', color: 'var(--text-faint)', fontSize: 13.5 }}>
           No tokens yet. Add one with the button above.
         </div>
