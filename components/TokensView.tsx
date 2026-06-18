@@ -13,7 +13,8 @@ function TokenRow({ token, onSend, onRemove }: { token: Token; onSend: (id: numb
     abi: erc20Abi,
     functionName: 'balanceOf',
     args: [address!],
-    query: { enabled: !!address },
+    // Re-read on-chain balance periodically so it reflects transfers (~1 Sepolia block).
+    query: { enabled: !!address, refetchInterval: 12_000 },
   })
   const formatted = isLoading ? '...' : Number(formatUnits(balance ?? 0n, token.decimals)).toLocaleString('en-US', { maximumFractionDigits: 4 })
 

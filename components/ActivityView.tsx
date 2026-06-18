@@ -14,17 +14,17 @@ function shortenAddr(a: string) { return `${a.slice(0,6)}...${a.slice(-4)}` }
 
 export default function ActivityView() {
   const { address } = useAccount()
-  const { jwt, signing, signIn } = useAuth()
+  const { isAuthed, signing, signIn } = useAuth()
   const [transfers, setTransfers] = useState<Transfer[]>([])
   const [filter, setFilter] = useState<'all' | 'in' | 'out'>('all')
   const [fetchError, setFetchError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!address || !jwt) return
+    if (!address || !isAuthed) return
     function fetch_() {
-      const headers = { Authorization: `Bearer ${jwt}` }
+      // Session cookie is sent automatically on these same-origin requests.
       Promise.all([
-        fetch(`/api/transfers?address=${address}`, { headers }).then(r => {
+        fetch(`/api/transfers?address=${address}`).then(r => {
           if (r.status === 401) throw new Error('auth')
           if (!r.ok) throw new Error(r.status === 503 ? 'Backend unavailable' : 'Transfer history failed to load')
           return r.json()
@@ -44,7 +44,7 @@ export default function ActivityView() {
     fetch_()
     const id = setInterval(fetch_, 5000)
     return () => clearInterval(id)
-  }, [address, jwt])
+  }, [address, isAuthed])
 
   const rows = transfers.filter(t => {
     if (filter === 'all') return true
@@ -58,7 +58,7 @@ export default function ActivityView() {
     { id: 'out' as const, label: 'Sent' },
   ]
 
-  const needsAuth = !jwt && !signing
+  const needsAuth = !isAuthed && !signing
 
   return (
     <div className="content-inner">

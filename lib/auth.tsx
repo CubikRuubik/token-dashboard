@@ -2,86 +2,96 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { useAccount, useSignMessage } from 'wagmi'
 
-export const SIGN_MESSAGE = 'Sign in to Token Dashboard'
-
-const KEY_TOKEN = 'auth_jwt'
-const KEY_ADDR = 'auth_addr'
-
 type AuthState = {
-  jwt: string | null
+  // The wallet we currently hold a valid session cookie for (lowercased), or null.
+  authedAddress: string | null
+  // True when the session matches the currently connected wallet.
+  isAuthed: boolean
   signing: boolean
   signIn: () => Promise<void>
+  signOut: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthState>({ jwt: null, signing: false, signIn: async () => {} })
+const AuthContext = createContext<AuthState>({
+  authedAddress: null,
+  isAuthed: false,
+  signing: false,
+  signIn: async () => {},
+  signOut: async () => {},
+})
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { address, status } = useAccount()
-  const [jwt, setJwt] = useState<string | null>(null)
+  const [authedAddress, setAuthedAddress] = useState<string | null>(null)
   const [hydrated, setHydrated] = useState(false)
   const [signing, setSigning] = useState(false)
   const { signMessageAsync } = useSignMessage()
 
-  // Load persisted token after mount — client-only, avoids SSR/hydration mismatch
+  const isAuthed = !!address && authedAddress === address.toLowerCase()
+
+  // Restore session state on mount — the httpOnly cookie can't be read by JS,
+  // so we ask the server who we are.
   useEffect(() => {
-    setJwt(sessionStorage.getItem(KEY_TOKEN))
-    setHydrated(true)
+    fetch('/api/auth/me')
+      .then(r => r.json())
+      .then(d => setAuthedAddress(d.address ?? null))
+      .catch(() => {})
+      .finally(() => setHydrated(true))
+  }, [])
+
+  const signOut = useCallback(async () => {
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
+    setAuthedAddress(null)
   }, [])
 
   const signIn = useCallback(async () => {
     if (!address || signing) return
     setSigning(true)
     try {
-      const signature = await signMessageAsync({ message: SIGN_MESSAGE })
+      // 1. Fetch a single-use nonce + the exact message to sign.
+      const nonceRes = await fetch(`/api/auth/nonce?address=${address}`)
+      if (!nonceRes.ok) return
+      const { message } = await nonceRes.json()
+
+      // 2. Sign it with the wallet.
+      const signature = await signMessageAsync({ message })
+
+      // 3. Verify — the BFF sets the httpOnly session cookie on success.
       const res = await fetch('/api/auth/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ address, signature }),
       })
       if (!res.ok) return
-      const { token } = await res.json()
-      sessionStorage.setItem(KEY_TOKEN, token)
-      sessionStorage.setItem(KEY_ADDR, address.toLowerCase())
-      setJwt(token)
+      const { address: authed } = await res.json()
+      setAuthedAddress((authed ?? address).toLowerCase())
     } catch {
-      // user rejected or request failed — jwt stays null
+      // user rejected or request failed — stay unauthenticated
     } finally {
       setSigning(false)
     }
   }, [address, signing, signMessageAsync])
 
-  // Clear token only on a definitive disconnect.
-  // NOT during 'reconnecting'/'connecting' — that's the page-refresh window
-  // where the wallet is being restored and the stored token must survive.
+  // Clear the session on a definitive disconnect (not during reconnecting).
   useEffect(() => {
     if (!hydrated) return
-    if (status === 'disconnected') {
-      sessionStorage.removeItem(KEY_TOKEN)
-      sessionStorage.removeItem(KEY_ADDR)
-      setJwt(null)
-    }
-  }, [status, hydrated])
+    if (status === 'disconnected' && authedAddress) signOut()
+  }, [status, hydrated]) // eslint-disable-line
 
-  // If the connected wallet differs from the token's address (account switch),
-  // drop the stale token so auto sign-in re-issues one for the new address.
+  // On account switch, drop the stale session so auto sign-in re-issues one.
   useEffect(() => {
-    if (!hydrated || !address) return
-    const tokenAddr = sessionStorage.getItem(KEY_ADDR)
-    if (tokenAddr && tokenAddr !== address.toLowerCase()) {
-      sessionStorage.removeItem(KEY_TOKEN)
-      sessionStorage.removeItem(KEY_ADDR)
-      setJwt(null)
-    }
-  }, [address, hydrated])
+    if (!hydrated || !address || !authedAddress) return
+    if (authedAddress !== address.toLowerCase()) signOut()
+  }, [address, hydrated]) // eslint-disable-line
 
-  // Auto sign-in once the wallet is connected and settled, if we have no token
+  // Auto sign-in once the wallet is connected and settled, if not yet authed.
   useEffect(() => {
     if (!hydrated) return
-    if (status === 'connected' && address && !jwt && !signing) signIn()
-  }, [status, address, jwt, hydrated]) // eslint-disable-line
+    if (status === 'connected' && address && !isAuthed && !signing) signIn()
+  }, [status, address, isAuthed, hydrated]) // eslint-disable-line
 
   return (
-    <AuthContext.Provider value={{ jwt, signing, signIn }}>
+    <AuthContext.Provider value={{ authedAddress, isAuthed, signing, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   )

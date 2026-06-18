@@ -17,7 +17,8 @@ function HoldingRow({
     abi: erc20Abi,
     functionName: 'balanceOf',
     args: [address!],
-    query: { enabled: !!address && connected },
+    // Re-read on-chain balance periodically so it reflects transfers (~1 Sepolia block).
+    query: { enabled: !!address && connected, refetchInterval: 12_000 },
   })
 
   const formatted = isLoading

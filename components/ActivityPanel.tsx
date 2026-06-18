@@ -40,16 +40,16 @@ export default function ActivityPanel({
   onViewAll: () => void
 }) {
   const { address } = useAccount()
-  const { jwt, signing, signIn } = useAuth()
+  const { isAuthed, signing, signIn } = useAuth()
   const [transfers, setTransfers] = useState<Transfer[]>([])
   const [fetchError, setFetchError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!address || !connected || !jwt) return
+    if (!address || !connected || !isAuthed) return
     function fetch_() {
-      const headers = { Authorization: `Bearer ${jwt}` }
+      // Session cookie is sent automatically on these same-origin requests.
       Promise.all([
-        fetch(`/api/transfers?address=${address}`, { headers }).then(r => {
+        fetch(`/api/transfers?address=${address}`).then(r => {
           if (r.status === 401) throw new Error('auth')
           if (!r.ok) throw new Error(r.status === 503 ? 'Backend unavailable' : 'Transfer history failed to load')
           return r.json()
@@ -69,7 +69,7 @@ export default function ActivityPanel({
     fetch_()
     const id = setInterval(fetch_, 5000)
     return () => clearInterval(id)
-  }, [address, connected, jwt])
+  }, [address, connected, isAuthed])
 
   if (!connected) {
     return (
@@ -84,7 +84,7 @@ export default function ActivityPanel({
     )
   }
 
-  const needsAuth = !jwt && !signing
+  const needsAuth = !isAuthed && !signing
 
   return (
     <section className="panel">
