@@ -1,8 +1,7 @@
 import { cookies } from "next/headers";
 
-const API_URL = process.env.NEST_API_URL ?? "http://localhost:3001";
+const API_URL = process.env.NEST_API_URL;
 
-// Name of the first-party (Next.js origin) session cookie set by the BFF.
 export const AUTH_COOKIE = "access_token";
 
 export class ApiError extends Error {
